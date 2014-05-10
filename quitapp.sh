@@ -20,83 +20,206 @@
 # application name is the name that Script Editor uses.
 # Often the process name and the application name are
 # identical, but not always.
+# 
+# This is Jon's version 1.5, with the -f option added by
+# Jerry Krinock, 20110325
 #-----------------------------------------------------------
 
 usage()
 {
-	echo "Usage: `basename $0` [-a] [-p] Application1 \"Application 2\" ..."
+	echo "Usage: `basename "$0"` [-a] [-p] [-s|n] [-f] <application names>"
 	echo ""
 	echo "Arguments are the names of one or more applications."
 	echo "Arguments are not case sensitive."
 	echo "Arguments with spaces should be quoted."
-	echo ""
+	echo
 	echo "Options:"
-	echo "	-a	Match argument string with any of the application's"
-	echo "		name, short name, title, or display name."
-	echo "		E.g.: \`quit \"Microsoft Word\"\` and \`quit -a Word\`"
+	echo " -a	Match argument string with any of the application's"
+	echo "		name, displayed name, short name, or title."
+	echo "		E.g.: \`quit \"microsoft word\"\` and \`quit -a word\`"
 	echo "		will both quit Microsoft Word, because the app calls"
 	echo "		itself \"Word\" in the menu bar."
-	echo "	-p	Use partial matches (e.g. edit for TextEdit). Prompts"
+	echo " -p	Use partial matches (e.g. edit for TextEdit). Prompts"
 	echo "		for confirmation."
-	echo ""
+	echo " -s	Attempt to save modified files when quitting."
+	echo "		Overrides any previous -n option."
+	echo " -n	Do not attempt to save modified files when quitting."
+	echo "		Overrides any previous -s option."
+	echo " -f	Do not print an error message if app is not running"
+	echo
+	echo "If neither the -s or -n options are specified, `basename "$0"` will try"
+	echo "to detemine if any documents require saving, and if necessary"
+	echo "will ask the user whether to save or not."
+	echo
 	exit 65
 }
 
-searchall=1
+tellToQuit()
+{
+	runningApps=`osascript -e "tell application \"System Events\" to count (application processes whose displayed name is \"$appname\")"`
+	
+	osascript -e "ignoring application responses" -e "tell application \"$appname\" to quit $saveAction" -e "end ignoring"
+
+	sleep 1
+	
+	waitCount=0
+	unscriptableWarningShown=false
+	
+	until [[ `osascript -e "tell application \"System Events\" to count (application processes whose displayed name is \"$appname\")"` -lt $runningApps || $waitCount -eq 10 ]]
+	do 
+		if [[ $scriptable == false && $unscriptableWarningShown == false ]]
+		then
+			echo "$appname does not respond to standard scripting terminology." 1>&2
+			echo "If it has unsaved changes, it may not quit." 1>&2
+			unscriptableWarningShown=true
+		fi
+		
+		sleep 1
+
+		waitCount=$(( $waitCount + 1 ))
+		if [[ $waitCount -ne 10 ]]
+		then 
+			printf . 1>&2
+		else 
+			printf . 1>&2
+			sleep 1
+			echo 1>&2; echo  "$appname has not quit. Give up?" 1>&2
+			read -n 1 -p "(y/n): "; echo 1>&2
+			if [[ $REPLY != y ]]; then waitCount=0; fi
+		fi
+	done
+	if [[ $waitCount -gt 0 && $waitCount -ne 10 ]]; then echo 1>&2; fi
+	if [[ $scriptable == false && $unscriptableWarningShown == true && `osascript -e "tell application \"System Events\" to count (application processes whose displayed name is \"$appname\")"` -lt $runningApps ]]; then echo "$appname has quit." 1>&2; fi
+}
+
+promptForApp()
+{
+	appname=`echo $appname | sed -e 's/^/\"/' -e 's/$/\"/' -e 's/, /\" \"/'`
+	echo "Choose the application to quit (Press Ctrl-C to cancel):"  1>&2
+	eval set $appname # this allows multi-word selections in select
+	select appname in "$@"
+	do
+		if [[ $appname == "" ]]
+		then
+			echo "Please select by number." 1>&2
+		else
+			break
+		fi
+	done
+}
+
+checkIfScriptable()
+{
+	# scriptable will be a string, either "true" or "false"
+	scriptable=`osascript -e "tell application \"System Events\" to return has scripting terminology of first application process whose displayed name is \"$appname\""`
+}
+
+setSaveAction()
+{
+	if [[ $saveAction == "" ]]
+	then 
+		checkForModifiedDocuments
+		
+		if [[ $needToSave -ge 1 ]] || [[ $needToSave -eq -1 && $scriptable == true ]]
+		then
+			promptForSaveAction		
+		fi
+	fi
+}
+
+checkForModifiedDocuments()
+{
+	# needToSave will be an integer. It will be -1 if there was an error.
+	needToSave=`osascript -e "try" -e "tell application \"$appname\" to count (get its documents whose modified is true)" -e "on error" -e "try" -e "tell application \"$appname\" to count (get its documents whose saved is false)" -e "on error" -e "-1" -e "end try" -e "end try"`
+}
+
+promptForSaveAction()
+{
+	if [[ $needToSave -gt 1 ]]
+	then
+		echo "Save changes to $needToSave modified documents? (Press Ctrl-C to cancel)" 1>&2
+		read -n 1 -p "(y/n): "; echo
+	elif [[ $needToSave -eq 1 ]]
+	then
+		echo "Save changes to $needToSave modified document? (Press Ctrl-C to cancel)" 1>&2
+		read -n 1 -p "(y/n): "; echo
+	elif [[ $needToSave -eq -1 ]]
+	then
+		echo -e "Save changes to modified documents (if any)? (Press Ctrl-C to cancel)" 1>&2
+		read -n 1 -p "(y/n): "; echo
+	fi
+	
+	if [[ -n $REPLY && $REPLY == y ]]
+	then
+		saveAction="saving yes"
+	elif [[ -n $REPLY && $REPLY == n ]]
+	then
+		saveAction="saving no"
+	elif [[ -n $REPLY ]]
+	then
+		echo "Invalid response. Aborted."  1>&2
+		exit			
+	else
+		exit
+	fi		
+}
+
+searchall="false"
 is_contains="is"
-while getopts "ap" opt
+saveAction=""
+ignoreNotRunning="false"
+while getopts "apnsf" opt
 do
 	case $opt in
-	a) searchall=0 ;;
+	a) searchall="true" ;;
 	p) is_contains="contains" ;;
-	[?]) usage; exit ;;
+	n) saveAction="saving no" ;;
+	s) saveAction="saving yes" ;;
+	f) ignoreNotRunning="true" ;;
+	[?]) usage ;;
 	esac
 	
 	shift $(($OPTIND - 1)) # Decrements the argument pointer so it points to next argument. $1 now references the first non option item supplied on the command-line if one exists.
 done
 
-if [ -z $1 ]; then usage; fi
+if [ -z "$1" ]; then usage; fi
 
 for arg in "$@"
 do
-	if [ searchall=0 ]
+	if [[ searchall == "true" ]]
 	then
-		appname=`osascript -e "tell application \"System Events\" to return every application process whose (name $is_contains \"$arg\" or short name $is_contains \"$arg\" or title $is_contains \"$arg\" or displayed name $is_contains \"$arg\")"`
+		appname=`osascript -e "tell application \"System Events\" to return displayed name of every application process whose (displayed name $is_contains \"$arg\" or name $is_contains \"$arg\" or short name $is_contains \"$arg\" or title $is_contains \"$arg\")"`
 	else
-		appname=`osascript -e "tell application \"System Events\" to return every application process whose name $is_contains \"$arg\""`
+		appname=`osascript -e "tell application \"System Events\" to return displayed name of every application process whose displayed name $is_contains \"$arg\""`
 	fi
 	
 	if [[ -n $appname && $appname != *", "* ]] # found 1 matching application
-	then 
+	then 		
 		if [[ $is_contains == is ]]
 		then
-			osascript -e "ignoring application responses" -e "tell application \"$appname\" to quit with saving" -e "end ignoring"
+			checkIfScriptable
+			setSaveAction
+			tellToQuit
 		else
-			echo "Choose the application to quit:"
-			
-			eval set $appname # this allows multi-word selections in select
-			select appname in "$@"
-			do
-				osascript -e "ignoring application responses" -e "tell application \"$appname\" to quit with saving" -e "end ignoring"
-				break
-			done
+			promptForApp
+			checkIfScriptable
+			setSaveAction
+			tellToQuit
 		fi
 			
 	elif [[ -z $appname ]] # found no matching application
 	then
-		echo "No running application matches \"$arg\""
+                if [[ $ignoreNotRunning == "false" ]]
+                then
+		   echo "No running application matches \"$arg\"" 1>&2
+                fi
 	
 	elif [[ $appname == *", "* ]] # found >1 matching applications.
 	then
-		appname=`echo $appname | sed -e 's/^/\"/' -e 's/$/\"/' -e 's/, /\" \"/'`
-		echo "\"$arg\" matches multiple applications."
-		echo "Choose the application to quit:"
-		
-		eval set $appname # this allows multi-word selections in select
-		select appname in "$@"
-		do
-			osascript -e "ignoring application responses" -e "tell application \"$appname\" to quit with saving" -e "end ignoring"
-			break
-		done
+		echo "\"$arg\" matches multiple applications." 1>&2
+		promptForApp
+		checkIfScriptable
+		setSaveAction
+		tellToQuit
 	fi
 done
