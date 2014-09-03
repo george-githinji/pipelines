@@ -21,7 +21,6 @@ function wait_run_in_parallel()
 #run the prediction and sanitize the output to csv file
 function predict(){
   local allele=$1
-  echo "running $allele"
   netMHCII-pan-3 -f $fasta_file -a $allele -length $peptide_len | 
   sed '/\#/d' | sed '/---/d' |
   sed '/Pos/d' | sed '/Number/d' | 
