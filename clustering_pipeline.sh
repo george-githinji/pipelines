@@ -76,7 +76,9 @@ for id in ${identities[@]}; do
 
        echo "Listing mutations per codon position"
        awk '{print $2,$4}' <cluster_$clustr.mutations.edited.txt | sort | uniq -c >cluster_$clustr.mutations_percodon_position.txt
-
+       
+       echo "printing dN-dS changes"
+       ~/Softwares/selection.rb -i cluster_$clustr.aln -S | awk '{print $4}' | sort | uniq -c >cluster_$clustr_dN_dS.txt
     cd ..
   done <most_clusters.txt
 
