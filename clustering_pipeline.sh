@@ -1,4 +1,21 @@
 #!/bin/bash
+#######################################################
+#This bash script takes a sequence file and clusters the sequences at predifined identities (98 - 88)
+#For each cluster in each identity, we align the sequences and search for changes, positions of the changes and the type of changes. 
+#We tally all the changes in each identity
+
+#Dependencies
+#Bio-cd-hit-report
+#Ruby
+#AWK
+#sed
+#translate.rb
+#mutation.rb
+
+#Author: George Githinji
+#Email: ggithinji@kemri-wellcome.org
+#MIT Licence
+#######################################################
 
 seqfile=$1
 
@@ -37,7 +54,6 @@ for id in ${identities[@]}; do
       
       echo "Translating"
       #translate the DNA file
-      #read_fasta -i "cluster_$clustr.fasta" | translate_seq -f 1 | write_fasta -x >cluster_$clustr.aa.fasta
       ruby ~/Softwares/translate.rb -i cluster_$clustr.fasta -f 1 -o cluster_$clustr.aa.fasta
      
       echo "Aligning sequences"
@@ -63,9 +79,9 @@ for id in ${identities[@]}; do
 
     cd ..
   done <most_clusters.txt
-    
-  cd ..
-echo "Combining all the mutations for $id identity threshold"
-find . -type f -name *.mutations.edited.txt | xargs cat | awk '{print $2,$4}'|sort | uniq -c >all.mutations.txt
 
+  echo "Combining all the mutations for $id identity threshold"
+  find . -type f -name *.mutations.edited.txt | xargs cat | awk '{print $2,$4}'|sort | uniq -c >all.mutations.txt
+
+  cd ..
 done
