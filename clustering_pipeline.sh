@@ -23,12 +23,24 @@ identities=(98 96 94 92 90 88)
 
 seqfilefullpath=$( cd $(dirname $seqfile); pwd)/$(basename $seqfile)
 
+#sort the input sequence with uclust
+uclust --sort $seqfile --output $seqfile.sorted.fasta --optimal
+
+sortedfilefullpath=$( cd $(dirname $seqfile); pwd)/$(basename $seqfile.sorted.fasta)
+
 #create the directories to hold output for each cluster identity
 for id in ${identities[@]}; do
   mkdir "${id}"
   fr_id=$(bc<<<"scale=2; $id/100")
   echo $fr_id
-  cd-hit-est -i $seqfile -o $id/cluster.${id} -c $fr_id
+
+  #cd-hit-est -i $seqfile -o $id/cluster.${id} -c $fr_id #retire cd-hit
+  
+  #use the uclust algorithm to perform the clustering
+  uclust --input $sortedfilefullpath --uc $id/cluster.${id}.uc --id ${fr_id}
+  
+  #convert the output to cd-hit format
+  uclust --uc2clstr $id/cluster.${id}.uc --output $id/cluster.${id}.clstr
 
   cd "${id}"
 
