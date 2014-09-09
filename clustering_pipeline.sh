@@ -24,7 +24,7 @@ identities=(98 96 94 92 90 88)
 seqfilefullpath=$( cd $(dirname $seqfile); pwd)/$(basename $seqfile)
 
 #sort the input sequence with uclust
-uclust --sort $seqfile --output $seqfile.sorted.fasta --optimal
+uclust --sort $seqfile --output $seqfile.sorted.fasta
 
 sortedfilefullpath=$( cd $(dirname $seqfile); pwd)/$(basename $seqfile.sorted.fasta)
 
@@ -33,11 +33,15 @@ for id in ${identities[@]}; do
   mkdir "${id}"
   fr_id=$(bc<<<"scale=2; $id/100")
   echo $fr_id
-
+   
+  #use cd-hit to cluster
   #cd-hit-est -i $seqfile -o $id/cluster.${id} -c $fr_id #retire cd-hit
   
   #use the uclust algorithm to perform the clustering
-  uclust --input $sortedfilefullpath --uc $id/cluster.${id}.uc --id ${fr_id}
+  #uclust --input $sortedfilefullpath --uc $id/cluster.${id}.uc --id ${fr_id} --optimal
+  
+  #use usearch7
+  usearch -cluster_smallmem $sortedfilefullpath -id ${fr_id} -centroids $id/cluster.${id}.nr.fasta -uc $id/cluster.${id}.uc
   
   #convert the output to cd-hit format
   uclust --uc2clstr $id/cluster.${id}.uc --output $id/cluster.${id}.clstr
@@ -45,7 +49,7 @@ for id in ${identities[@]}; do
   cd "${id}"
 
   #Write a file containing the cluster-id and respective list of cluster members
-  echo "Parsing CDHIT clusters"
+  echo "Parsing clusters"
 
   ruby  ~/Softwares/parse-cdhit.rb cluster.$id.clstr member >seqs_per_cluster.txt
   ruby ~/Softwares/parse-cdhit.rb cluster.$id.clstr size >seq_numbers_per_cluster.txt
@@ -61,9 +65,10 @@ for id in ${identities[@]}; do
       
       echo "writing fasta file for cluster_$clustr"
       #write the fasta members for clustr $name
-      pcregrep "^$clustr:" ../seqs_per_cluster.txt | awk -F: '{print $2}' | tr , '\n' |
-      awk '{gsub("_","\\_",$0);$0="(?s)^>"$0".*?(?=\\n(\\z|>))"}1' | pcregrep -oM -f - $seqfilefullpath >cluster_$clustr.fasta
-      
+      #pcregrep "^$clustr:" ../seqs_per_cluster.txt | awk -F: '{print $2}' | tr , '\n' |
+      #awk '{gsub("_","\\_",$0);$0="(?s)^>"$0".*?(?=\\n(\\z|>))"}1' | pcregrep -oM -f - $seqfilefullpath >cluster_$clustr.fasta
+      pcregrep "^$clustr" ../seqs_per_cluster.txt | awk -F: '{print $2}' | tr , '\n' | fastagrep -F -X -f - $seqfilefullpath >cluster_$clustr.fasta
+
       echo "Translating"
       #translate the DNA file
       ruby ~/Softwares/translate.rb -i cluster_$clustr.fasta -f 1 -o cluster_$clustr.aa.fasta
@@ -95,7 +100,7 @@ for id in ${identities[@]}; do
   done <most_clusters.txt
 
   echo "Combining all the mutations for $id identity threshold"
-  find . -type f -name *.mutations.edited.txt | xargs cat | awk '{print $2,$4}'|sort | uniq -c >all.mutations.txt
-
+  find . -type f -name *.mutations.edited.txt | xargs cat | awk '{print $2,$4}'|sort | uniq -c | sed -e 's/^[ \t]*//' >all.mutations.txt
+  
   cd ..
 done
