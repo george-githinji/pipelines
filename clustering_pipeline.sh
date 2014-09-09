@@ -19,7 +19,9 @@
 
 seqfile=$1
 
-identities=(98 96 94 92 90 88)
+[ $# -eq 0 ] && { echo "Usage: $0 nucleotide_file"; exit 1;}
+
+identities=(98 96 94 92 90 88 86)
 
 seqfilefullpath=$( cd $(dirname $seqfile); pwd)/$(basename $seqfile)
 
@@ -64,32 +66,34 @@ for id in ${identities[@]}; do
     cd cluster_$clustr
       
       echo "writing fasta file for cluster_$clustr"
+      
       #write the fasta members for clustr $name
-      #pcregrep "^$clustr:" ../seqs_per_cluster.txt | awk -F: '{print $2}' | tr , '\n' |
-      #awk '{gsub("_","\\_",$0);$0="(?s)^>"$0".*?(?=\\n(\\z|>))"}1' | pcregrep -oM -f - $seqfilefullpath >cluster_$clustr.fasta
-      pcregrep "^$clustr" ../seqs_per_cluster.txt | awk -F: '{print $2}' | tr , '\n' | fastagrep -F -X -f - $seqfilefullpath >cluster_$clustr.fasta
+      grep "^${clustr}:" ../seqs_per_cluster.txt | awk -F: '{print $2}' | tr , '\n' >members.txt
+      fastagrep -F -X -f members.txt $sortedfilefullpath >cluster_$clustr.fasta
 
       echo "Translating"
       #translate the DNA file
       ruby ~/Softwares/translate.rb -i cluster_$clustr.fasta -f 1 -o cluster_$clustr.aa.fasta
      
       echo "Aligning sequences"
-      #align both DNA and AA sequences
+      align both DNA and AA sequences
       muscle -in cluster_$clustr.fasta -out cluster_$clustr.aln
       muscle -in cluster_$clustr.aa.fasta -out cluster_$clustr.aa.aln
       
       echo "finding mutations from the alignments"
+      
       #find the mutations 
       ruby ~/Softwares/mutation.rb cluster_$clustr.aln >cluster_$clustr.mutations.txt
 
       echo "listing mutation positions"
+     
       #list the positions for each mutation
       awk -F, '{print $1}' cluster_$clustr.mutations.txt | sort -nrk 1 |
       uniq  >cluster_$clustr.mutation.positions.txt
 
       echo "Sanitizing"
-       sed 's/A-G/G-A/g; s/T-C/C-T/g; s/A-T/T-A/g; s/A-C/C-A/g; s/C-G/G-C/g; s/T-G/G-T/g; s/--T/T--/g; s/--G/G--/g; s/--C/C--/g; s/--A/A--/g;' <cluster_$clustr.mutations.txt | 
-       awk -F, '{print $1,$2,$3,$4}' | sort -nrk 1 | uniq >cluster_$clustr.mutations.edited.txt
+      sed 's/A-G/G-A/g; s/T-C/C-T/g; s/A-T/T-A/g; s/A-C/C-A/g; s/C-G/G-C/g; s/T-G/G-T/g; s/--T/T--/g; s/--G/G--/g; s/--C/C--/g; s/--A/A--/g;' <cluster_$clustr.mutations.txt | 
+      awk -F, '{print $1,$2,$3,$4}' | sort -nrk 1 | uniq >cluster_$clustr.mutations.edited.txt
 
        echo "Listing mutations per codon position"
        awk '{print $2,$4}' <cluster_$clustr.mutations.edited.txt | sort | uniq -c >cluster_$clustr.mutations_percodon_position.txt
