@@ -76,7 +76,7 @@ for id in ${identities[@]}; do
       ruby ~/Softwares/translate.rb -i cluster_$clustr.fasta -f 1 -o cluster_$clustr.aa.fasta
      
       echo "Aligning sequences"
-      align both DNA and AA sequences
+      #align both DNA and AA sequences
       muscle -in cluster_$clustr.fasta -out cluster_$clustr.aln
       muscle -in cluster_$clustr.aa.fasta -out cluster_$clustr.aa.aln
       
