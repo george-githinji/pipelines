@@ -25,7 +25,7 @@ s=$4
 echo "indexing $REF as reference file"
 smalt index -k $k -s $s index.$k.$s $1 #this will index and rename the index based on the values supplied at the commandline
 
-#run SMALT to map the reads against the conntigs
+#run SMALT to map the reads against the contigs
 echo "running SMALT with k=$k and s=$s parameters"
 smalt map -f sam -o $REF.sam index.$k.$s $READS
 
