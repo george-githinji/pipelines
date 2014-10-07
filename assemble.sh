@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #This script should be run from the  grouped_by_clones folder. i.e all the sequences for each isolate's clones are located
-#please run the copy_per_colony script first to generate this list of sequences
+#run the copy_per_colony script first to generate this list of sequences
 
 #get the list of isolates from ls the current folder
 echo "generating a list of isolate names"
@@ -23,6 +23,7 @@ do
 
   #ls | perl -lne 'print /B[0-9]{1,3}-([0-9]{1,2})/' >$isolate\_clones.txt
   ls *.fasta | perl -lne 'print /B[0-9]{1,3}-([0-9]{1,2})/' >$isolate\_clones.txt
+  
   #remove empty lines
   sed '/^$/d' $isolate\_clones.txt | uniq >temp.txt
   mv temp.txt $isolate\_clones.txt
