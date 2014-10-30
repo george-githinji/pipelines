@@ -84,6 +84,7 @@ for id in ${identities[@]}; do
       
       #find the mutations 
       ruby ~/Softwares/mutation.rb cluster_$clustr.aln >cluster_$clustr.mutations.txt
+      ruby ~/Code/Ruby/blocks/lib/count_snps_in_blocks.rb cluster_$clustr.aln >cluster_$clustr.snps.txt
 
       echo "listing mutation positions"
      
@@ -104,7 +105,7 @@ for id in ${identities[@]}; do
   done <most_clusters.txt
 
   echo "Combining all the mutations for $id identity threshold"
-  find . -type f -name *.mutations.edited.txt | xargs cat | awk '{print $2,$4}'|sort | uniq -c | sed -e 's/^[ \t]*//' >all.mutations.txt
-  
+  find . -type f -name *.mutations.edited.txt | xargs cat | awk '{print $2,$4}'| sort | uniq -c | sed -e 's/^[ \t]*//' >all.mutations.txt
+  find . -type f -name *.snps.txt | xargs cat | sed -e 's/^[ \t]*//' >all.snps.txt
   cd ..
 done
