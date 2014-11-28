@@ -1,3 +1,4 @@
+
 #!/bin/bash
 #######################################################
 #This bash script takes a sequence file and clusters the sequences at predifined identities (98 - 88)
@@ -84,8 +85,30 @@ for id in ${identities[@]}; do
       
       #find the mutations 
       ruby ~/Softwares/mutation.rb cluster_$clustr.aln >cluster_$clustr.mutations.txt
-      ruby ~/Code/Ruby/blocks/lib/count_snps_in_blocks.rb cluster_$clustr.aln >cluster_$clustr.snps.txt
+      ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb cluster_$clustr.aln >cluster_$clustr.snps.txt
 
+      #create a file for region coordinates
+      ruby ~/Code/Ruby/blocks/lib/print_hv_positions.rb cluster_$clustr.aln >regions_positions.txt
+      
+      #split alignment to blocks and print start and stop positions
+      bash ~/Code/Bash/splice_alignment.sh regions_positions.txt cluster_$clustr.aln
+
+      #find snps for each region
+      ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb region_1.aln >snps_region1.txt
+      ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb region_2.aln >snps_region2.txt
+      ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb region_3.aln >snps_region3.txt
+      ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb region_4.aln >snps_region4.txt
+      ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb region_5.aln >snps_region5.txt
+      ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb region_6.aln >snps_region6.txt
+
+      echo "calculating snp densities for regions"
+      bash ~/Code/Bash/snp_density.sh regions_positions.txt snps_region1.txt cluster_$clustr.aln >region1_snp_density.txt
+      bash ~/Code/Bash/snp_density.sh regions_positions.txt snps_region2.txt cluster_$clustr.aln >region2_snp_density.txt
+      bash ~/Code/Bash/snp_density.sh regions_positions.txt snps_region3.txt cluster_$clustr.aln >region3_snp_density.txt
+      bash ~/Code/Bash/snp_density.sh regions_positions.txt snps_region4.txt cluster_$clustr.aln >region4_snp_density.txt
+      bash ~/Code/Bash/snp_density.sh regions_positions.txt snps_region5.txt cluster_$clustr.aln >region5_snp_density.txt
+      bash ~/Code/Bash/snp_density.sh regions_positions.txt snps_region6.txt cluster_$clustr.aln >region6_snp_density.txt
+      
       echo "listing mutation positions"
      
       #list the positions for each mutation
@@ -104,8 +127,23 @@ for id in ${identities[@]}; do
     cd ..
   done <most_clusters.txt
 
-  echo "Combining all the mutations for $id identity threshold"
+  echo "collect all the mutations for $id identity threshold"
   find . -type f -name *.mutations.edited.txt | xargs cat | awk '{print $2,$4}'| sort | uniq -c | sed -e 's/^[ \t]*//' >all.mutations.txt
   find . -type f -name *.snps.txt | xargs cat | sed -e 's/^[ \t]*//' >all.snps.txt
+
+  echo "collect all snps"
+  find . -type f -name snps_region1.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region1.snps.txt
+  find . -type f -name snps_region2.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region2.snps.txt
+  find . -type f -name snps_region3.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region3.snps.txt
+  find . -type f -name snps_region4.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region4.snps.txt
+  find . -type f -name snps_region5.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region5.snps.txt
+
+  echo "collect snp densities"
+  find . -type f -name region1_snp_density.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region1.snps.density.txt
+  find . -type f -name region2_snp_density.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region2.snps.density.txt
+  find . -type f -name region3_snp_density.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region3.snps.density.txt
+  find . -type f -name region4_snp_density.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region4.snps.density.txt
+  find . -type f -name region5_snp_density.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region5.snps.density.txt
+  find . -type f -name region6_snp_density.txt | xargs cat | sed -e 's/^[ \t]*//' >all.region6.snps.density.txt
   cd ..
 done
