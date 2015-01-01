@@ -36,16 +36,16 @@ for id in ${identities[@]}; do
   mkdir "${id}"
   fr_id=$(bc<<<"scale=2; $id/100")
   echo $fr_id
-   
+
   #use cd-hit to cluster
   #cd-hit-est -i $seqfile -o $id/cluster.${id} -c $fr_id #retire cd-hit
-  
+
   #use the uclust algorithm to perform the clustering
   #uclust --input $sortedfilefullpath --uc $id/cluster.${id}.uc --id ${fr_id} --optimal
-  
+
   #use usearch7
   usearch -cluster_smallmem $sortedfilefullpath -id ${fr_id} -centroids $id/cluster.${id}.nr.fasta -uc $id/cluster.${id}.uc
-  
+
   #convert the output to cd-hit format
   uclust --uc2clstr $id/cluster.${id}.uc --output $id/cluster.${id}.clstr
 
@@ -54,7 +54,7 @@ for id in ${identities[@]}; do
   #Write a file containing the cluster-id and respective list of cluster members
   echo "Parsing clusters"
 
-  ruby  ~/Softwares/parse-cdhit.rb cluster.$id.clstr member >seqs_per_cluster.txt
+  ruby ~/Softwares/parse-cdhit.rb cluster.$id.clstr member >seqs_per_cluster.txt
   ruby ~/Softwares/parse-cdhit.rb cluster.$id.clstr size >seq_numbers_per_cluster.txt
 
   echo "Sorting cluster numbers"
@@ -80,14 +80,14 @@ for id in ${identities[@]}; do
       #align both DNA and AA sequences
       muscle -in cluster_$clustr.fasta -out cluster_$clustr.aln
       muscle -in cluster_$clustr.aa.fasta -out cluster_$clustr.aa.aln
- 
+
      #echo "finding mutations from the alignments"
-      
+
       #find the mutations 
-      #this procedure does not scale properly
+      #this procedure takes a long time to complete.
       #ruby ~/Softwares/mutation.rb cluster_$clustr.aln >cluster_$clustr.mutations.txt
 
-      #replaced the previous with 
+      #replace mutation.rb with polymorphic_sites.rb
       echo "Searching for polymorphic sites"
       ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb cluster_$clustr.aln >cluster_$clustr.snps.txt
 
@@ -97,7 +97,7 @@ for id in ${identities[@]}; do
       #split alignment to blocks and print start and stop positions
       bash ~/Code/Bash/splice_alignment.sh regions_positions.txt cluster_$clustr.aln
 
-      #find snps for each region
+      #find snps in each region
       ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb region_1.aln >snps_region1.txt
       ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb region_2.aln >snps_region2.txt
       ruby ~/Code/Ruby/blocks/lib/polymorphic_sites.rb region_3.aln >snps_region3.txt
@@ -113,7 +113,7 @@ for id in ${identities[@]}; do
       bash ~/Code/Bash/snp_density.sh regions_positions.txt snps_region5.txt cluster_$clustr.aln >region5_snp_density.txt
       bash ~/Code/Bash/snp_density.sh regions_positions.txt snps_region6.txt cluster_$clustr.aln >region6_snp_density.txt
 
-     # echo "listing mutation positions"
+      #echo "listing mutation positions"
       #list the positions for each mutation
       #awk -F, '{print $1}' cluster_$clustr.mutations.txt | sort -nrk 1 |
       #uniq  >cluster_$clustr.mutation.positions.txt
@@ -122,10 +122,10 @@ for id in ${identities[@]}; do
       #sed 's/A-G/G-A/g; s/T-C/C-T/g; s/A-T/T-A/g; s/A-C/C-A/g; s/C-G/G-C/g; s/T-G/G-T/g; s/--T/T--/g; s/--G/G--/g; s/--C/C--/g; s/--A/A--/g;' <cluster_$clustr.mutations.txt | 
       #awk -F, '{print $1,$2,$3,$4}' | sort -nrk 1 | uniq >cluster_$clustr.mutations.edited.txt
 
-       #echo "Listing mutations per codon position"
-       #awk '{print $2,$4}' <cluster_$clustr.mutations.edited.txt | sort | uniq -c >cluster_$clustr.mutations_percodon_position.txt
+      #echo "Listing mutations per codon position"
+      #awk '{print $2,$4}' <cluster_$clustr.mutations.edited.txt | sort | uniq -c >cluster_$clustr.mutations_percodon_position.txt
 
-       echo "dN-dS substitutions"
+      echo "dN-dS substitutions"
        ~/Softwares/selection.rb -i cluster_$clustr.aln -S | awk '{print $4}' | sort | uniq -c >cluster_$clustr.dN_dS.txt
     cd ..
   done <most_clusters.txt
